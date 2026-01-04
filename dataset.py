@@ -19,13 +19,12 @@ def load_cora_dataset():
 
     return graph
 
-def train_test_split_edges(graph: dgl.DGLGraph, test_ratio: float = 0.1, seed: int = 42) -> Tuple[dgl.DGLGraph, List[Tuple[int, int]]]:
+def train_test_split_edges(graph, test_ratio=0.1, seed=42):
     random.seed(seed)
-
     nx_graph = graph.to_networkx().to_undirected()
 
     edges = list(nx_graph.edges())
-    num_test = int(len(edges) * test_ratio)
+    num_test = max(1, int(len(edges) * test_ratio))  # ensure at least 1 edge
 
     random.shuffle(edges)
 
@@ -35,20 +34,25 @@ def train_test_split_edges(graph: dgl.DGLGraph, test_ratio: float = 0.1, seed: i
     for u, v in edges:
         if removed >= num_test:
             break
-
         nx_graph.remove_edge(u, v)
-
         if nx.is_connected(nx_graph):
             test_pos_edges.append((u, v))
             removed += 1
         else:
             nx_graph.add_edge(u, v)
 
+    # sanity check
+    if len(test_pos_edges) == 0:
+        raise ValueError("No edges could be removed while keeping the graph connected. Reduce test_ratio.")
+
     train_graph = dgl.from_networkx(nx_graph)
-    train_graph = dgl.to_simple_graph(train_graph)
+    train_graph = dgl.to_simple(train_graph)
     train_graph = dgl.remove_self_loop(train_graph)
 
+    print(f"Test positive edges: {len(test_pos_edges)}")
+
     return train_graph, test_pos_edges
+
 
 def negative_sampling(full_graph: dgl.DGLGraph, positive_edges: List[Tuple[int, int]], seed: int = 42) -> List[Tuple[int, int]]:
     random.seed(seed)
