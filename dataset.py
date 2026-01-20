@@ -78,3 +78,49 @@ def compute_auc(pos_scores, neg_scores):
 # Final check
 assert nx.is_connected(training_graph)
 assert len(test_neg_edges) == len(test_pos_edges)
+
+################################### Heuristics #####################################
+def common_neighbors(g, edges):
+    scores = []
+    for (u, v) in edges:
+        cn = len(list(nx.common_neighbors(g, u, v)))
+        scores.append(cn)
+    return torch.tensor(scores)
+
+pos_scores = common_neighbors(training_graph, test_pos_edges)
+neg_scores = common_neighbors(training_graph, test_neg_edges)
+auc = compute_auc(pos_scores, neg_scores)
+print("Common Neighbours AUC:", auc)
+
+def jaccard(g, edges):
+    scores = []
+    for (u, v) in edges:
+        nu = set(g.neighbors(u))
+        nv = set(g.neighbors(v))
+        union = nu | nv
+        if len(union) == 0:
+            scores.append(0)
+        else:
+            scores.append(len(nu & nv) / len(union))
+    return torch.tensor(scores)
+
+pos_scores = jaccard(training_graph, test_pos_edges)
+neg_scores = jaccard(training_graph, test_neg_edges)
+auc = compute_auc(pos_scores, neg_scores)
+print("Jaccard AUC:", auc)
+
+def adamic_adar(g, edges):
+    scores = []
+    for (u, v) in edges:
+        score = 0
+        for w in nx.common_neighbors(g, u, v):
+            deg = g.degree(w)
+            if deg > 1:
+                score += 1 / np.log(deg)
+        scores.append(score)
+    return torch.tensor(scores)
+
+pos_scores = adamic_adar(training_graph, test_pos_edges)
+neg_scores = adamic_adar(training_graph, test_neg_edges)
+auc = compute_auc(pos_scores, neg_scores)
+print("Adamic Adar AUC:", auc)
